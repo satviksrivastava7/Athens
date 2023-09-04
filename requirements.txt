@@ -4,4 +4,4 @@ base58==2.0.1
 numpy==1.19.2
 pillow==8.0.1
 scikit-learn==0.23.2
-matplotlib
+matplotlib==3.5.2
