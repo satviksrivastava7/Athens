@@ -32,6 +32,12 @@ with title_container:
 def build_model(df, model_choice):
     label = df.iloc[:, -1].unique()
     df.iloc[:, -1] = LabelEncoder().fit_transform(df.iloc[:, -1])
+
+    df = df.dropna()
+    non_numeric_columns = df.select_dtypes(exclude=[np.number]).columns.tolist()
+    removed_features = df[non_numeric_columns]
+    df = df.select_dtypes(include=[np.number])
+
     X = df.iloc[:,:-1]
     Y = df.iloc[:,-1]
 
@@ -43,11 +49,19 @@ def build_model(df, model_choice):
     st.write('Test set')
     st.info(X_test.shape)
 
+    st.markdown('**1.3. Removed Features**:')
+    if removed_features is None:
+        st.write("No Features were removed")
+    else:
+        st.write('Following non-numeric features were removed for training of the model')
+        st.write(removed_features)
+
     st.markdown('**1.3. Variable details**:')
     st.write('X variable')
     st.info(list(X.columns))
     st.write('Y variable')
     st.info(Y.name)
+
 
     if model_choice == 'Logistic Regression':
         model = LogisticRegression(random_state=parameter_random_state)
@@ -127,7 +141,7 @@ with st.sidebar.subheader('2.2. General Parameters'):
 if uploaded_file is not None:
     st.subheader('1. Dataset')
     df = pd.read_csv(uploaded_file)
-    st.markdown('**1.1. Glimpse of dataset**')
+    st.markdown('**1.1. Preprocessed Dataset**')
     st.write(df)
 
     build_model(df, model_choice)
