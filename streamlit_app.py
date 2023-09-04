@@ -30,69 +30,92 @@ with title_container:
                     unsafe_allow_html=True)
 
 def build_model(df, model_choice):
-    label = df.iloc[:, -1].unique()
-    df.iloc[:, -1] = LabelEncoder().fit_transform(df.iloc[:, -1])
+    # ... (previous code remains the same) ...
+    target = df.columns[-1]
 
-    df = df.dropna()
-    non_numeric_columns = df.select_dtypes(exclude=[np.number]).columns.tolist()
-    removed_features = df[non_numeric_columns]
-    df = df.select_dtypes(include=[np.number])
-
-    X = df.iloc[:,:-1]
-    Y = df.iloc[:,-1]
-
-    X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=(100-split_size)/100)
-
-    st.markdown('**1.2. Data splits**')
-    st.write('Training set')
-    st.info(X_train.shape)
-    st.write('Test set')
-    st.info(X_test.shape)
-
-    st.markdown('**1.3. Removed Features**:')
-    if removed_features is None:
-        st.write("No Features were removed")
+    # Check if the target variable is continuous or categorical
+    if df[target].nunique() <= 10:  # Assuming 10 unique values or less is categorical
+        is_classification = True
     else:
-        st.write('Following non-numeric features were removed for training of the model')
-        st.write(removed_features)
+        is_classification = False
 
-    st.markdown('**1.3. Variable details**:')
-    st.write('X variable')
-    st.info(list(X.columns))
-    st.write('Y variable')
-    st.info(Y.name)
+    if is_classification:
+        # Classification problem
+        label = df[target].unique()
+        df[target] = LabelEncoder().fit_transform(df[target])
 
+        # Drop rows with missing values
+        df = df.dropna()
 
-    if model_choice == 'Logistic Regression':
-        model = LogisticRegression(random_state=parameter_random_state)
-    elif model_choice == 'KNN':
-        model = KNeighborsClassifier(n_neighbors=parameter_n_neighbors)
+        # Split data into X (features) and Y (target)
+        X = df.iloc[:, :-1]
+        Y = df.iloc[:, -1]
     else:
-        model = SVC(kernel='linear', C=1.0)
+        # Regression problem
+        # Drop rows with missing values in any column
+        df = df.dropna()
 
+        # Split data into X (features) and Y (target)
+        X = df.iloc[:, :-1]
+        Y = df.iloc[:, -1]
+
+    # Split data into training and testing sets
+    X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=(100 - split_size) / 100)
+
+    # Model selection based on user choice
+    if is_classification:
+        if model_choice == 'Logistic Regression':
+            model = LogisticRegression(random_state=parameter_random_state)
+        elif model_choice == 'KNN':
+            model = KNeighborsClassifier(n_neighbors=parameter_n_neighbors)
+        else:
+            model = SVC(kernel='linear', C=1.0)
+    else:
+        if model_choice == 'Linear Regression':
+            model = LinearRegression()
+        elif model_choice == 'KNN Regression':
+            model = KNeighborsRegressor(n_neighbors=parameter_n_neighbors)
+        else:
+            model = SVR(kernel='linear', C=1.0)
+
+    # Fit the model
     model.fit(X_train, Y_train)
 
     st.subheader('2. Model Performance')
 
-    st.markdown('**2.1. Training set**')
+    # Predictions on training set
     Y_pred_train = model.predict(X_train)
-    st.write('Accuracy Score:')
-    st.info(accuracy_score(Y_train, Y_pred_train))
+    st.markdown('**2.1. Training set**')
+    if is_classification:
+        st.write('Accuracy Score:')
+        st.info(accuracy_score(Y_train, Y_pred_train))
+    else:
+        st.write('R-squared Score:')
+        st.info(r2_score(Y_train, Y_pred_train))
+        st.write('Mean Squared Error:')
+        st.info(mean_squared_error(Y_train, Y_pred_train))
 
-    st.markdown('**2.2. Test set**')
+    # Predictions on test set
     Y_pred_test = model.predict(X_test)
-    st.write('Accuracy Score:')
-    st.info(accuracy_score(Y_test, Y_pred_test))
+    st.markdown('**2.2. Test set**')
+    if is_classification:
+        st.write('Accuracy Score:')
+        st.info(accuracy_score(Y_test, Y_pred_test))
+    else:
+        st.write('R-squared Score:')
+        st.info(r2_score(Y_test, Y_pred_test))
+        st.write('Mean Squared Error:')
+        st.info(mean_squared_error(Y_test, Y_pred_test))
 
     st.subheader('3. Model Parameters')
     st.write(model)
-
-    if len(df.columns) >= 3:
-        X_vis = df.iloc[:, :2]
+    # Create a scatter plot separated by classifier's decision boundary (for classification models)
+    if is_classification and len(df.columns) >= 3:
+        X_vis = df.iloc[:, :2]  # Use only the first two columns for visualization
         clf = model
-        clf.fit(X_train.iloc[:, :2], Y_train)
+        clf.fit(X_train.iloc[:, :2], Y_train)  # Fit the model using the 2-feature dataset
 
-        h = .02
+        h = .02  # Step size in the mesh
         x_min, x_max = X_vis.iloc[:, 0].min() - 1, X_vis.iloc[:, 0].max() + 1
         y_min, y_max = X_vis.iloc[:, 1].min() - 1, X_vis.iloc[:, 1].max() + 1
         xx, yy = np.meshgrid(np.arange(x_min, x_max, h), np.arange(y_min, y_max, h))
@@ -104,22 +127,37 @@ def build_model(df, model_choice):
         plt.style.use('dark_background')
         plt.rc('axes', axisbelow=True)
         plt.grid(linestyle='--', alpha=0.6)
-        plt.contourf(xx, yy, Z, cmap=plt.cm.Blues, alpha=0.8)
+        plt.contourf(xx, yy, Z, cmap=plt.cm.Blues, alpha=0.8)  # Use Blues colormap for the decision boundary
 
         scatter = plt.scatter(X_vis.iloc[:, 0], X_vis.iloc[:, 1], c=Y, cmap=plt.cm.Greens, edgecolor='k')
 
         handles, labels = scatter.legend_elements()
-        legend_labels = [str(label[i]) for i in range(len(label))]
+        legend_labels = [str(label[i]) for i in range(len(label))]  # Get label values as strings
         legend = plt.legend(handles, legend_labels, title="Class Labels")
 
         plt.xlabel(X_vis.columns[0])
         plt.ylabel(X_vis.columns[1])
         plt.title("Dataset Separated by Classifier's Decision Boundary")
 
+        st.subheader("4. Results")
+        st.pyplot(plt)
+    elif not is_classification and len(df.columns) >= 2:
+        # Regression model scatter plot
+        Y_pred = model.predict(X_test)
+
+        plt.figure(figsize=(8, 6))
+        plt.style.use('dark_background')
+        plt.rc('axes', axisbelow=True)
+        plt.grid(linestyle='--', alpha=0.6)
+        plt.scatter(Y_test, Y_pred, c='green', marker='o', edgecolor='k')
+        plt.xlabel("Actual Values")
+        plt.ylabel("Predicted Values")
+        plt.title("Actual vs. Predicted Values")
+
         st.subheader("Results")
         st.pyplot(plt)
     else:
-        st.warning("The dataset does not have enough features for the plot.")
+        st.warning("The dataset does not have enough features for plotting.")
 
 st.info('Upload a CSV file to train a classification model and visualize results')
 
