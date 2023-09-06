@@ -10,7 +10,7 @@ from sklearn.neighbors import KNeighborsClassifier
 from sklearn.linear_model import LogisticRegression
 
 st.set_page_config(page_title='Athens.ai',
-                   layout='wide', page_icon='athenslogo.png', theme='light')
+                   layout='wide', page_icon='athenslogo.png')
 
 st.markdown("""
         <style>
